@@ -202,7 +202,7 @@ int main() {
   int lane = 1;
 
   // Target speed
-  double ref_speed = 49.5;
+  double ref_speed = 10;
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,&lane,&ref_speed](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -217,12 +217,12 @@ int main() {
 
       if (s != "") {
         auto j = json::parse(s);
-        
+
         string event = j[0].get<string>();
-        
+
         if (event == "telemetry") {
           // j[1] is the data JSON object
-          
+
         	// Main car's localization Data
           	double car_x = j[1]["x"];
           	double car_y = j[1]["y"];
@@ -234,7 +234,7 @@ int main() {
           	// Previous path data given to the Planner
           	auto previous_path_x = j[1]["previous_path_x"];
           	auto previous_path_y = j[1]["previous_path_y"];
-          	// Previous path's end s and d values 
+          	// Previous path's end s and d values
           	double end_path_s = j[1]["end_path_s"];
           	double end_path_d = j[1]["end_path_d"];
 
@@ -244,7 +244,7 @@ int main() {
           	json msgJson;
 
 		int prev_size = previous_path_x.size();
-	
+
 		// Anchor points
 		vector<double> ptsx;
 		vector<double> ptsy;
@@ -253,35 +253,108 @@ int main() {
 		double ref_y = car_y;
 		double ref_yaw = deg2rad(car_yaw);
 
-		cout << prev_size << endl;
-
+		// ################################################################
+		// Setup anchor points [start with two previous]
 		if (prev_size >= 2) {
-		  ptsx.push_back(previous_path_x[prev_size-2]);
-		  ptsx.push_back(previous_path_x[prev_size-1]);
 
-		  ptsy.push_back(previous_path_y[prev_size-2]);		
-		  ptsy.push_back(previous_path_y[prev_size-1]);
+		  double ref_x_prev = previous_path_x[prev_size-2];
+		  double ref_y_prev = previous_path_y[prev_size-2];
+
+		  // Update reference position to last point
+		  ref_x = previous_path_x[prev_size-1];
+		  ref_y = previous_path_y[prev_size-1];
+		  ref_yaw = atan2(ref_y-ref_y_prev, ref_x-ref_x_prev);
+
+		  ptsx.push_back(ref_x_prev);
+		  ptsx.push_back(ref_x);
+
+		  ptsy.push_back(ref_y_prev);
+		  ptsy.push_back(ref_y);
 		}
 
-		for (int i=1; i++; i<4) {
-		  vector<double> next_pt = getXY(car_s+i*30, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+		else {
+		  double prev_x = car_x - cos(ref_yaw);
+		  double prev_y = car_x - sin(ref_yaw);
+
+		  ptsx.push_back(prev_x);
+		  ptsx.push_back(car_x);
+
+		  ptsy.push_back(prev_y);
+		  ptsy.push_back(car_y);
+
+		}
+
+		// ################################################################
+		// Add a few forward anchor points
+		vector<double> next_pt;
+		for (int i=1; i<=3; i++) {
+		  next_pt = getXY(car_s+i*30, (2+4*lane),
+				  map_waypoints_s,
+				  map_waypoints_x,
+				  map_waypoints_y);
 		  ptsx.push_back(next_pt[0]);
-		  ptsx.push_back(next_pt[1]);
+		  ptsy.push_back(next_pt[1]);
 		}
 
-		// Spline fitting points
-		tk::spline s;
-		s.set_points(ptsx, ptsy);
 		
-          	vector<double> next_x_vals;
+		// ################################################################
+		// Convert to car-heading frame of reference
+		for (int i=0; i<ptsx.size(); i++) {
+		  double new_x = ptsx[i] - ref_x;
+		  double new_y = ptsy[i] - ref_y;
+
+		  cout << "x:" << ptsx[i] << "  ";
+		  cout << "y:" << ptsy[i] << endl;
+
+		  ptsx[i] = new_x*cos(0-ref_yaw) - new_y*sin(0-ref_yaw);
+		  ptsy[i] = new_x*sin(0-ref_yaw) + new_y*cos(0-ref_yaw);	  
+
+		}
+
+		// ################################################################
+		// Spline fitting anchor points
+		tk::spline s;
+		for (int i=0; i<ptsx.size() ; i++) {
+		  cout << "sX: " << ptsx[i] << "  sY: " << ptsy[i] << endl;
+		}
+		s.set_points(ptsx, ptsy);
+
+		// ################################################################
+		vector<double> next_x_vals;
           	vector<double> next_y_vals;
 
-		// First let's fill previous
-		for (int i=0; i++; i<prev_size) {
+		// First let's fill previous points
+		for (int i=0; i<prev_size; i++) {
 		  next_x_vals.push_back(previous_path_x[i]);
 		  next_y_vals.push_back(previous_path_y[i]);
 		}
+
+		// ################################################################
+		// Fill up remaining with spline-fits
+
+		double target_x = 30.0;
+		double target_y = s(target_x);
+		double target_d = sqrt(target_x*target_x + target_y*target_y);
+
+		double N = target_d / (0.02*ref_speed/2.24);
+		double x_point = 0;
+		double y_point = 0;
+
+		for (int i=0; i<50-prev_size; i++) {
+		  x_point += target_x/N;
+		  y_point = s(x_point);
+
+		  double new_x = ref_x + x_point*cos(ref_yaw) - y_point*sin(ref_yaw);
+		  double new_y = ref_y + x_point*sin(ref_yaw) + y_point*cos(ref_yaw);
+
+		  next_x_vals.push_back(new_x);
+		  next_y_vals.push_back(new_y);
+
+		  cout << "newX:" << new_x << "  ";
+		  cout << "newY:" << new_y << endl;
 		
+		}
+
 
 		msgJson["next_x"] = next_x_vals;
           	msgJson["next_y"] = next_y_vals;
@@ -290,7 +363,7 @@ int main() {
 
           	//this_thread::sleep_for(chrono::milliseconds(1000));
           	ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-          
+
         }
       } else {
         // Manual driving
