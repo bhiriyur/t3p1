@@ -202,7 +202,7 @@ int main() {
   int lane = 1;
 
   // Target speed
-  double ref_speed = 10;
+  double ref_speed = 49.5;
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,&lane,&ref_speed](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -274,7 +274,7 @@ int main() {
 
 		else {
 		  double prev_x = car_x - cos(ref_yaw);
-		  double prev_y = car_x - sin(ref_yaw);
+		  double prev_y = car_y - sin(ref_yaw);
 
 		  ptsx.push_back(prev_x);
 		  ptsx.push_back(car_x);
@@ -303,9 +303,6 @@ int main() {
 		  double new_x = ptsx[i] - ref_x;
 		  double new_y = ptsy[i] - ref_y;
 
-		  cout << "x:" << ptsx[i] << "  ";
-		  cout << "y:" << ptsy[i] << endl;
-
 		  ptsx[i] = new_x*cos(0-ref_yaw) - new_y*sin(0-ref_yaw);
 		  ptsy[i] = new_x*sin(0-ref_yaw) + new_y*cos(0-ref_yaw);	  
 
@@ -314,9 +311,6 @@ int main() {
 		// ################################################################
 		// Spline fitting anchor points
 		tk::spline s;
-		for (int i=0; i<ptsx.size() ; i++) {
-		  cout << "sX: " << ptsx[i] << "  sY: " << ptsy[i] << endl;
-		}
 		s.set_points(ptsx, ptsy);
 
 		// ################################################################
@@ -337,12 +331,13 @@ int main() {
 		double target_d = sqrt(target_x*target_x + target_y*target_y);
 
 		double N = target_d / (0.02*ref_speed/2.24);
-		double x_point = 0;
-		double y_point = 0;
+		double x_addon = 0;
 
 		for (int i=0; i<50-prev_size; i++) {
-		  x_point += target_x/N;
-		  y_point = s(x_point);
+		  double x_point = x_addon + target_x/N;
+		  double y_point = s(x_point);
+
+		  x_addon = x_point;
 
 		  double new_x = ref_x + x_point*cos(ref_yaw) - y_point*sin(ref_yaw);
 		  double new_y = ref_y + x_point*sin(ref_yaw) + y_point*cos(ref_yaw);
@@ -350,9 +345,7 @@ int main() {
 		  next_x_vals.push_back(new_x);
 		  next_y_vals.push_back(new_y);
 
-		  cout << "newX:" << new_x << "  ";
-		  cout << "newY:" << new_y << endl;
-		
+	
 		}
 
 
