@@ -201,10 +201,10 @@ int main() {
   // Start in lane 1
   int lane = 1;
 
-  // Target speed
-  double ref_speed = 49.5;
+  // Target velocity
+  double ref_vel = 0.0;
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,&lane,&ref_speed](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,&lane,&ref_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -244,6 +244,102 @@ int main() {
           	json msgJson;
 
 		int prev_size = previous_path_x.size();
+
+		// ################################################################
+		// Check if we are getting too close
+		bool too_close = false;
+		int num_cars = sensor_fusion.size();
+
+		bool left_blocked = false;
+		bool right_blocked = false;
+		bool hard_brake = false;
+		
+		for (int i=0; i<num_cars; i++) {
+		  double icar_s = sensor_fusion[i][5];
+		  double icar_d = sensor_fusion[i][6];
+		  double icar_vx = sensor_fusion[i][3];
+		  double icar_vy = sensor_fusion[i][4];
+		  double icar_v = sqrt(icar_vx*icar_vx + icar_vy*icar_vy);
+
+		  // Calculate distance (future) from car
+		  double icar_dist = icar_s + prev_size*0.02*icar_v - car_s;
+
+		  // check if car is in our lane
+		  if (icar_d > 4*lane && icar_d < 4*lane+4) {
+
+		    // check if in front of us and too close
+		    if (icar_dist > 0.0 && icar_dist < 40) {
+		      too_close = true;
+		      if (icar_dist < 3.0) hard_brake = true;
+		    }
+		  } else if ((icar_s-car_s) > -5 && icar_dist < 40) {
+		    // within thirty meters
+		    if (icar_d <= car_d && icar_d > (car_d-4)) {
+		      left_blocked = true;
+		      //cout << "LBLK " << icar_spacing << " CAR " << i << endl;
+		    } else if (icar_d >= car_d && icar_d < (car_d + 4)){
+		      right_blocked = true;
+		      //cout << "RBLK " << icar_spacing << " CAR " << i << endl;
+		    }
+		  }
+		}
+
+		if (left_blocked ) {cout << "\r XXXX ";} else {cout << "\r ____ ";}
+		if (right_blocked) {cout <<   " XXXX ";} else {cout <<   " ____ ";}
+
+		
+		bool slow_further = false;
+		bool turning = false;
+		if (too_close) {
+		  ref_vel -= 0.2; // slow down
+		  	  
+		  if (car_d>= 0 && car_d <= 4 && !right_blocked) {
+		    cout << "L >>>> M";
+		    slow_further = true;
+		    turning = true;
+		    lane = 1;
+
+		  } else if (car_d>= 8 && car_d <= 12 && !left_blocked) {
+		    cout << "R <<<< M";
+		    slow_further = true;
+		    turning = true;
+		    lane = 1;
+
+		  } else if (car_d>= 4 && car_d <= 8 && !left_blocked) {
+		    cout << "M <<<< L";
+		    slow_further = true;
+		    turning = true;
+		    lane = 0;
+
+		  } else if (car_d>= 4 && car_d <= 8 && !right_blocked) {
+		    cout << "M >>>> R";
+		    slow_further = true;
+		    turning = true;
+		    lane = 2;
+
+		  } else {
+		    cout << "SLOWING  ---";
+		    slow_further = true;
+		    if (hard_brake) {
+		      ref_vel -= 10;
+		      if (ref_vel < 0) ref_vel = 0;
+		      cout << " BRAKE!!!";
+		    }
+		    
+		  }
+
+		  if (slow_further) {
+		    ref_vel -= 0.3;
+		  }
+		  
+		} else if (ref_vel < 49.5) {
+		  cout << "SPEEDING +++";
+		  ref_vel += 0.3;  // speed up
+		} else {
+		  cout << "            ";
+		}
+
+		fflush(stdout);
 
 		// Anchor points
 		vector<double> ptsx;
@@ -287,8 +383,11 @@ int main() {
 		// ################################################################
 		// Add a few forward anchor points
 		vector<double> next_pt;
+		double dp = ref_vel/2.25*3;
+		if (dp < 30) dp = 30;
+		if (dp > 70) dp = 70;
 		for (int i=1; i<=3; i++) {
-		  next_pt = getXY(car_s+i*30, (2+4*lane),
+		  next_pt = getXY(car_s+i*dp, (2+4*lane),
 				  map_waypoints_s,
 				  map_waypoints_x,
 				  map_waypoints_y);
@@ -296,7 +395,7 @@ int main() {
 		  ptsy.push_back(next_pt[1]);
 		}
 
-		
+
 		// ################################################################
 		// Convert to car-heading frame of reference
 		for (int i=0; i<ptsx.size(); i++) {
@@ -304,7 +403,7 @@ int main() {
 		  double new_y = ptsy[i] - ref_y;
 
 		  ptsx[i] = new_x*cos(0-ref_yaw) - new_y*sin(0-ref_yaw);
-		  ptsy[i] = new_x*sin(0-ref_yaw) + new_y*cos(0-ref_yaw);	  
+		  ptsy[i] = new_x*sin(0-ref_yaw) + new_y*cos(0-ref_yaw);
 
 		}
 
@@ -326,11 +425,11 @@ int main() {
 		// ################################################################
 		// Fill up remaining with spline-fits
 
-		double target_x = 30.0;
+		double target_x = 30.0;	
 		double target_y = s(target_x);
 		double target_d = sqrt(target_x*target_x + target_y*target_y);
 
-		double N = target_d / (0.02*ref_speed/2.24);
+		double N = target_d / (0.02*ref_vel/2.24);
 		double x_addon = 0;
 
 		for (int i=0; i<50-prev_size; i++) {
@@ -345,7 +444,6 @@ int main() {
 		  next_x_vals.push_back(new_x);
 		  next_y_vals.push_back(new_y);
 
-	
 		}
 
 
