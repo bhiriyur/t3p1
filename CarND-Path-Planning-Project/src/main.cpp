@@ -254,6 +254,9 @@ int main() {
 		bool right_blocked = false;
 		bool hard_brake = false;
 
+		double min_ds = 100;
+		int min_i = 0;
+
 		for (int i=0; i<num_cars; i++) {
 		  double icar_s = sensor_fusion[i][5];
 		  double icar_d = sensor_fusion[i][6];
@@ -269,7 +272,13 @@ int main() {
 		    icar_tcol = (icar_s-car_s)/dv;
 		  }
 		  double dt = 3;                          // Threshold time (for collision)
-		  double s_coll = dt*car_speed*0.44704;   // Threshold distance
+		  double s_coll = 30 + car_speed/50*20;   // Distance to keep (meters)
+		  double st = 0.02*prev_size*car_speed*0.44704;
+
+		  if (ds > 0 && ds < min_ds) {
+		    min_ds = ds;
+		    min_i = i;
+		  }
 
 		  // ============================================================
 		  // check if car is in target lane
@@ -285,15 +294,15 @@ int main() {
 		  // ============================================================
 		  // check if car is in left lane
 		  if (icar_d >= (4*lane-4) && icar_d < (4*lane)) {
-		    if (ds > -5 && ds < s_coll) {
+		    if (ds > -5 && ds < st) {
 		      left_blocked = true;
 		    }
 		  }
 
 		  // ============================================================
 		  // check if car is in right lane
-		  if (icar_d >= (4*lane) && icar_d < (4*lane+4)) {
-		    if (ds > -5 && ds < s_coll) {
+		  if (icar_d >= (4*lane+4) && icar_d < (4*lane+8)) {
+		    if (ds > -5 && ds < st) {
 		      right_blocked = true;
 		    }
 		  }
@@ -346,13 +355,15 @@ int main() {
 
 		  } else if (slow_further) {
 		    cout << " SLOWING ...";
-		    ref_vel = max(0.0, ref_vel-1);
+		    ref_vel = max(0.0, ref_vel-0.5);
 		  }
 
 		} else if (ref_vel < 49.5) {
 		  cout << "SPEEDING ^^^";
-		  ref_vel += 0.3;
+		  ref_vel += 0.5;
 		}
+
+		cout << " MIN = " << min_i << " " << min_ds;
 
 		fflush(stdout);
 
