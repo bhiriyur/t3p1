@@ -325,7 +325,7 @@ int main() {
 			// check if car is in right lane
 			if (icar_d >= (4*lane+4) && icar_d < (4*lane+8)) {
 			  if (ds > -5) {
-			    if (ds < ds_t1) left_blocked = true;
+			    if (ds < ds_t1) right_blocked = true;
 			    if (ds < dblock_r) dblock_r = ds;
 			  }
 			}
@@ -501,7 +501,7 @@ int main() {
 		      double N = target_d / (0.02*ref_vel*0.44707);
 		      double x_addon = 0;
 
-		      for (int i=0; i<50-prev_size; i++) {
+		      for (int i=0; i<100-prev_size; i++) {
 			double x_point = x_addon + target_x/N;
 			double y_point = s(x_point);
 
