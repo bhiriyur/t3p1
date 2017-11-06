@@ -79,3 +79,13 @@ Initially there were many successive lane changes and the car was snaking around
 
 ## Performance
 
+The car has been driving reasonably well around the highway track, but it is not fool-proof. I have been able to complete the 4.35 mile loop multiple times, however sometimes incidents do occur especially when there is too much traffic and blockage ahead and no clear paths to change lanes exist.
+
+Here is a [youtube video](https://youtu.be/-qm6gbvs-ZQ) showing successful driving performance:
+
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=-qm6gbvs-ZQ
+" target="_blank"><img src="http://img.youtube.com/vi/-qm6gbvs-ZQ/0.jpg"
+alt="T3P1" width="240" height="180" border="10" /></a>
+
+Overall I believe the requirements specified in the rubric have been met. However the performance can certainly be improved. One approach could be to develop cost functions for every action that can be taken (with different weights for possible outcomes) and then choosing the optimal action that minimizes cost. 
+
