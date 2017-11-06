@@ -286,14 +286,9 @@ int main() {
 
 			double ds = icar_s - car_s;             // Relative distance
 			double dv = car_speed*0.44704 - icar_v; // Relative velocity
-			double icar_tcol = 100;                 // Time to collision
-			if (ds > 0 && dv > 0)
-			  icar_tcol = (icar_s-car_s)/dv;
 
 			double ds_t0 = 30 + car_speed/50*20;       // Distance to keep (my lane)
 			double ds_t1 = 0.02*75*car_speed*0.44704;  // Distance to keep (other lane)
-
-
 
 			if (ds > 0 && ds < min_ds) {
 			  min_ds = ds;
@@ -378,7 +373,7 @@ int main() {
 			} else if (ok_to_change && turn_right) {
 			  // turning right
 			  cout << " >>>> ";
-			  ref_vel -= 0.3;
+			  ref_vel -= 0.5;
 			  lane = min(max_lanes-1, lane+1);
 			  nchange = 0;
 
