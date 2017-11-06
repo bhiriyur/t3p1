@@ -234,7 +234,7 @@ int main() {
 		      // Number of lanes available
 		      const int max_lanes = 3;
 		      const double max_speed = 49;
-		      
+
 		      // j[1] is the data JSON object
 		      // Main car's localization Data
 		      double car_x = j[1]["x"];
@@ -274,7 +274,7 @@ int main() {
 		      double dblock = 1000;                    // Distance to blockage ahead
 		      double dblock_l = 1000;                  // Clear distance in left lane
 		      double dblock_r = 1000;                  // Clear distance in right lane
-		      
+
 		      for (int i=0; i<num_cars; i++) {
 			// The other car's coordinates, velocity
 			double icar_s = sensor_fusion[i][5];
@@ -289,11 +289,11 @@ int main() {
 			double icar_tcol = 100;                 // Time to collision
 			if (ds > 0 && dv > 0)
 			  icar_tcol = (icar_s-car_s)/dv;
-			
+
 			double ds_t0 = 30 + car_speed/50*20;       // Distance to keep (my lane)
 			double ds_t1 = 0.02*75*car_speed*0.44704;  // Distance to keep (other lane)
 
-		  
+
 
 			if (ds > 0 && ds < min_ds) {
 			  min_ds = ds;
@@ -349,7 +349,7 @@ int main() {
 
 			// Try to change lane
 			if (car_d>= 0 && car_d <= 4) {
-			  // From left-most lane		    
+			  // From left-most lane
 			  if (!right_blocked) turn_right = true;
 
 			} else if (car_d>= 4*(max_lanes-1) && car_d <= 4*max_lanes) {
@@ -364,7 +364,7 @@ int main() {
 			    if (dblock_l > dblock_r) turn_left = true;
 			    else                     turn_right = true;
 			  }
-			  else if (!left_blocked)  turn_left = true;		      
+			  else if (!left_blocked)  turn_left = true;
 			  else if (!right_blocked) turn_right = true;
 			}
 
@@ -374,14 +374,14 @@ int main() {
 			  ref_vel -= 0.5;
 			  lane = max(0, lane-1);
 			  nchange = 0;
-			  
+
 			} else if (ok_to_change && turn_right) {
 			  // turning right
 			  cout << " >>>> ";
 			  ref_vel -= 0.3;
 			  lane = min(max_lanes-1, lane+1);
 			  nchange = 0;
-			  
+
 			} else {
 			  // Not changing lanes. Slow down further
 			  cout << " ____ ";
@@ -391,7 +391,7 @@ int main() {
 			if (hard_brake) {
 			  cout << " !!!! ";
 			  ref_vel = max(0.0, ref_vel-5);
-			} 
+			}
 		      }
 		      // ============================================================
 		      // GOING STRAIGHT
@@ -405,7 +405,7 @@ int main() {
 		      }
 
 		      cout << " " << nchange;
-		      cout << " " << dblock_l;      
+		      cout << " " << dblock_l;
 		      cout << " " << dblock_r;
 
 		      fflush(stdout);
